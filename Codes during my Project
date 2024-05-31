@@ -1,0 +1,254 @@
+#!/bin/bash
+
+# Set paths
+MainDir=/Users/slord/Desktop/First_Level
+OutPath=/Users/slord/Downloads
+
+# Specify inputs
+SubjectList=(S02WT	S04JH	S06MN	S09SR	S12AP	S15LP	S17CS	S19SG	S21FH	S23LPJ	S25MM
+S03CT	S05MB	S07JB	S10RM	S13HK	S16JM	S18SC	S20PV	S22EK	S24CSJ)
+ContrastList=(cope1 cope6 cope11 cope26 cope27 cope28 cope29 cope30 cope31 cope32 cope33)  # Replace with your contrast identifiers
+
+# Output
+OutTable=FeatQueryResults_Engell_0.4_Face_Mask.csv
+
+# Create or clear the output file
+echo "Subject,Contrast,Mean,StdDev" > "$OutPath"/"$OutTable"
+
+
+# Loop through subjects and contrasts
+for Subject in "${SubjectList[@]}"; do
+    for Contrast in "${ContrastList[@]}"; do
+        # Set the path to the featquery output directory
+        FeatQueryDir="$MainDir"/"$Subject"/secondlevel.gfeat/"$Contrast".feat/featquery_Engell_0.4_Face_Mask
+
+        # Run featquery and extract mean and standard deviation
+        Mean=$(fslstats "$FeatQueryDir"/"$Contrast".featquery -M)
+        StdDev=$(fslstats "$FeatQueryDir"/"$Contrast".featquery -S)
+
+        # Append results to the output table
+        echo "$Subject,$Contrast,$Mean,$StdDev" >> "$OutPath"/"$OutTable"
+    done
+done
+
+
+
+featquery 11 \
+    /path/to/cope1.feat \
+    /path/to/cope6.feat \
+    /path/to/cope11.feat \
+    /path/to/cope26.feat \
+    /path/to/cope27.feat \
+    /path/to/cope28.feat \
+    /path/to/cope29.feat \
+    /path/to/cope30.feat \
+    /path/to/cope31.feat \
+    /path/to/cope32.feat \
+    /path/to/cope33.feat \
+    2 stats/pe1 stats/zstat1 \
+    featquery_Faces_0.4_thresholded_mask \
+    -p -s /Users/slord/Desktop/Faces-Places_Mask_Engel/facescene_pmap_stat3_0.40_Thresholded.nii.gz
+
+
+
+
+/Users/slord/Desktop/Masks/TOM_MASKS/DMPFC_MASK.nii.gz
+
+
+#!/bin/bash
+
+# Set paths
+MainDir=/Users/slord/Desktop/First_Level/S*/Analysis_output/Second_Level.gfeat/
+OutPath=/Users/slord/Downloads
+
+# Specify inputs
+SubjectList=(S02WT S04JH S06MN S09SR S12AP S15LP S17CS S19SG S21FH S23LPJ S25MM
+S03CT S05MB S07JB S10RM S13HK S16JM S18SC S20PV S22EK S24CSJ)
+ContrastList=(cope1 cope6 cope11 cope26 cope27 cope28 cope29 cope30 cope31 cope32 cope33)  # Replace with your contrast identifiers
+
+# Output
+OutTable=FeatQueryResults_Engell_0.4_Face_Mask.csv
+
+# Create or clear the output file
+echo "Subject,Contrast,Mean,StdDev" > "$OutPath"/"$OutTable"
+
+# Loop through subjects and contrasts
+for Subject in "${SubjectList[@]}"; do
+    for Contrast in "${ContrastList[@]}"; do
+        # Set the path to the featquery output directory
+        FeatQueryDir="$MainDir"/"$Subject"/secondlevel.gfeat/"$Contrast".feat/featquery_Engell_0.4_Face_Mask
+
+        # Run featquery and extract mean and standard deviation
+        Mean=$(fslstats "$FeatQueryDir"/"$Contrast".featquery -M)
+        StdDev=$(fslstats "$FeatQueryDir"/"$Contrast".featquery -S)
+
+        # Append results to the output table
+        echo "$Subject,$Contrast,$Mean,$StdDev" >> "$OutPath"/"$OutTable"
+    done
+
+    # Run featquery for Faces in the same loop
+    featquery 11 \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope1.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope6.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope11.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope26.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope27.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope28.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope29.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope30.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope31.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope32.feat \
+        "$MainDir"/"$Subject"/secondlevel.gfeat/cope33.feat \
+        2 stats/pe1 stats/zstat1 \
+        featquery_Faces_0.4_thresholded_mask \
+        -p -s /Users/slord/Desktop/Faces-Places_Mask_Engel/facescene_pmap_stat3_0.40_Thresholded.nii.gz
+done
+
+
+
+
+
+# Set the main directory
+MainDir="/Users/slord/Desktop/First_Level"
+
+# Loop through all participant folders
+for "$MainDir"/S*/; do
+    
+    # Create the Place_ROI directory inside the participant folder
+    mkdir "$MainDir"/S*/Place_ROI
+done
+
+
+
+
+
+
+
+
+
+
+
+
+
+#!/bin/bash 
+#Put a list of your subject IDs here
+SubjData=(S03CT S04JH S05MB S06MN S07JB S09SR S10RM S12AP S13HK S15LP S16JM S17CS S18SC S19SG S20PV S21FH S22EK S23LPJ S24CSJ S25MM)
+ 
+#Put the directory path where all subject folders are here
+export HomeDir= /Users/slord/Desktop/First_Level/
+ 
+#Put the directory where your .fsf file is 
+export ScriptsDir= /Users/slord/Desktop/Analysis_Batches/Second_Level_TOM
+ 
+#This is looping through each subject, and will. ..  
+for ((s=0;s<${#SubjData[@]};++s)); do
+ 
+        #Find and replace each SubjID with the next one and resave it under a name unique to that subject.
+        sed -e"s/S02WT/${SubjData[$s]}/g" "$ScriptsDir"/S02WT_Second_Level_TOM.fsf > /Users/slord/Desktop/First_Level/${SubjData[$s]}/Analysis_output/Second_Level_TOM_${SubjData[$s]}.fsf
+ 
+        #This runs the .fsf!
+        feat /Users/slord/Desktop/First_Level/${SubjData[$s]}/Analysis_output/Second_Level_TOM_${SubjData[$s]}.fsf
+ 
+        echo running FEAT ${SubjData[$s]}
+ 
+done
+
+
+
+bin/bash 
+SubjData= ‘(S02WT S03CT S04JH S05MB S06MN S07JB S09SR S10RM S12AP S13HK S15LP S16JM S17CS S18SC S19SG S20PV S21FH S22EK S23LPJ S24CSJ S25MM)’
+ export HomeDir= /Users/slord/Desktop/First_Level/
+ export ScriptsDir= /Users/slord/Desktop/Analysis_Batches/Second_Level_TOM
+ for ((s=0;s<${#SubjData[@]};++s)); do
+         sed -e"s/S02WT/${SubjData[$s]}/g" "$ScriptsDir"/S02WT_Second_Level_TOM.fsf > /Users/slord/Desktop/First_Level/S*/Analysis_output/Second_Level_TOM_${SubjData[$s]}.fsf
+         feat /Users/slord/Desktop/First_Level/S*/Analysis_output/Second_Level_TOM_${SubjData[$s]}.fsf
+        echo running FEAT ${SubjData[$s]}
+ 
+done
+Using these coordinates for each participant ( SubjData= ‘(S02WT S03CT S04JH S05MB S06MN S07JB S09SR S10RM S12AP S13HK S15LP S16JM S17CS S18SC S19SG S20PV S21FH S22EK S23LPJ S24CSJ S25MM)’ ):
+Voxel Coordinates (x y z)
+Participant
+62 47 28
+02
+60 26 45
+03
+61 42 34
+04
+27 37 33
+05
+63 46 29
+06
+55 36 39
+07
+55 26 62
+09
+28 43 34
+10
+30 49 24
+12
+30 46 24
+13
+35 38 41
+15
+26 42 30
+16
+60 49 27 
+17
+59 44 26
+18
+37 36 43
+19
+57 37 27
+20
+61 50 25
+21
+25 25 53
+22
+54 39 35
+23
+33 37 46
+24
+57 31 46
+25
+
+Please create a ROI Sphere using this code as for example for participant S02WT.
+
+fslmaths /Users/slord/fsl/data/standard/MNI152_T1_2mm_brain -mul 0 -add 1 -roi 62 1 47 1 28 1 0 1 /Users/slord/Desktop/First_Level/S02WT/Place_ROI/PLACE_S02WT_ROI_point -odt float
+
+fslmaths /Users/slord/Desktop/First_Level/S02WT/ROI/S02WT_ROI_point -kernel sphere 5 -fmean  /Users/slord/Desktop/First_Level/S02WT/Place_ROI/PLACE_S02WT_Sphere -odt float
+
+As you can see the coordinates for S02WT are the first ones because it is the first participant the one after it would be S03CT, so :
+
+
+
+fslmaths /Users/slord/fsl/data/standard/MNI152_T1_2mm_brain -mul 0 -add 1 -roi 60 1 26 1 45 1 0 1 /Users/slord/Desktop/First_Level/S03CT/Place_ROI/PLACE_ S03CT_ROI_point -odt float
+
+fslmaths /Users/slord/Desktop/First_Level/S03CT/ROI/S03CT_ROI_point -kernel sphere 5 -fmean  /Users/slord/Desktop/First_Level/S03CT/Place_ROI/PLACE_ S03CT_Sphere -odt float
+
+ AND SO ON…
+
+
+
+
+Yo can you help me rename some files?
+For each participant 
+( SubjData= ‘(S02WT S03CT S04JH S05MB S06MN S07JB S09SR S10RM S12AP S13HK S15LP S16JM S17CS S18SC S19SG S20PV S21FH S22EK S23LPJ S24CSJ S25MM)’ ):
+Inside their folder for example: /Users/slord/Desktop/First_Level/S02WT/Face_ROI/
+There are two files: S02WT_ROI_point.nii.gz and S02WT_ROI_Sphere.nii.gz
+I would want to rename them both FACE_S02WT_ROI_point.nii.gz and FACE_S02WT_ROI_Sphere.nii.gz
+Can you help me with doing that for each participants?
+
+
+
+SubjData=(S02WT S03CT S04JH S05MB S06MN S07JB S09SR S10RM S12AP S13HK S15LP S16JM S17CS S18SC S19SG S20PV S21FH S22EK S23LPJ S24CSJ S25MM)
+
+for subj in "${SubjData[@]}"; do
+    mv "/Users/slord/Desktop/First_Level/${subj}/Face_ROI/${subj}_ROI_point.nii.gz" "/Users/slord/Desktop/First_Level/${subj}/Face_ROI/FACE_${subj}_point.nii.gz"
+    mv "/Users/slord/Desktop/First_Level/${subj}/Face_ROI/${subj}_ROI_Sphere.nii.gz" "/Users/slord/Desktop/First_Level/${subj}/Face_ROI/FACE_${subj}_Sphere.nii.gz"
+done
+
+
+
+fslchfiletype NIFTI_GZ DMPFC_wxyz.img
+
+fslmaths DMPFC_wxyz.nii.gz -bin DMPFC_MASK.nii.gz
