@@ -1,0 +1,96 @@
+%%%%%%%% FOR FACES %%%%%%%
+
+% Define the ROIs of interest
+ROI1 = 203;  % ROI number 203
+ROI2 = 144;  % ROI number 144
+
+% Define the sessions of interest
+sessions_of_interest = [3, 4];  % Columns 3 and 4
+
+% Initialize ROIMI matrix to store results
+ROIMI = zeros(size(MI, 1), length(sessions_of_interest));
+
+% Loop over subjects (participants)
+for subj = 1:size(MI, 1)
+    % Loop over sessions of interest
+    for sesh_idx = 1:length(sessions_of_interest)
+        sesh = sessions_of_interest(sesh_idx);
+        
+        % Extract MI connectivity matrix for the current subject and session
+        MI_matrix = MI{subj, sesh};
+        
+        % Check if the size of MI_matrix is appropriate
+        if size(MI_matrix, 1) >= max(ROI1, ROI2) && size(MI_matrix, 2) >= max(ROI1, ROI2)
+            % Extract MI value for ROI1 and ROI2 from the connectivity matrix
+            ROIMI(subj, sesh_idx) = MI_matrix(ROI1, ROI2);
+        else
+            % Handle case where ROI indices exceed matrix dimensions
+            disp(['Error: ROI indices exceed matrix dimensions for subj = ', num2str(subj), ', sesh = ', num2str(sesh)]);
+            % You may want to handle this case depending on your specific scenario
+            % ROIMI(subj, sesh_idx) = NaN; % or another suitable value
+        end
+    end
+end
+
+% Create a figure
+figure;
+
+% Plot the data points
+plot(ones(size(ROIMI, 1), 1), ROIMI(:, 1), 'o', 'MarkerFaceColor', 'b', 'MarkerEdgeColor', 'b', 'DisplayName', 'Session 3');
+hold on;
+plot(2*ones(size(ROIMI, 1), 1), ROIMI(:, 2), 'o', 'MarkerFaceColor', 'r', 'MarkerEdgeColor', 'r', 'DisplayName', 'Session 4');
+
+% Set plot labels and title
+xlabel('Phenomenological Dimension');
+ylabel('ROI Connectivity Value');
+title('Mutual Information Functional Connectivity Values across Sessions');
+
+% Adjust plot aesthetics
+xlim([0.5, 2.5]);
+xticks([1, 2]);
+xticklabels({'Face', 'No Face'});
+grid on;
+
+% Adjust figure properties if needed
+set(gca, 'FontSize', 12);  % Increase font size for better readability
+
+% Example data setup
+% ROIMI should already be defined from your previous code
+
+% Calculate mean and standard deviation of ROIMI columns
+mean_ROIMI = mean(ROIMI);
+std_ROIMI = std(ROIMI);
+
+% Define outlier threshold (3 standard deviations from the mean)
+outlier_threshold = 3 * std_ROIMI;
+
+% Find outliers in ROIMI data
+outliers = abs(ROIMI - mean_ROIMI) > outlier_threshold;
+
+% Initialize matrix to count outliers per participant
+outliers_per_participant = zeros(size(ROIMI, 1), 1);
+
+% Loop over participants to count outliers
+for subj = 1:size(ROIMI, 1)
+    outliers_per_participant(subj) = sum(outliers(subj, :));
+end
+
+% Display participants with outliers
+disp('Participants with outliers:');
+disp(find(outliers_per_participant > 0));
+
+% Plotting outliers (example for illustration)
+figure;
+scatter(ones(sum(outliers(:, 1)), 1), ROIMI(outliers(:, 1), 1), 'b', 'filled', 'DisplayName', 'Outliers in Session 3');
+hold on;
+scatter(2 * ones(sum(outliers(:, 2)), 1), ROIMI(outliers(:, 2), 2), 'r', 'filled', 'DisplayName', 'Outliers in Session 4');
+xlabel('Session');
+ylabel('ROI Connectivity Value');
+title('Outliers Detected in ROI Connectivity Values');
+xticks([1, 2]);
+xticklabels({'Session 3', 'Session 4'});
+legend('show');
+grid on;
+
+% Adjust figure properties if needed
+set(gca, 'FontSize', 12);  % Increase font size for better readability
