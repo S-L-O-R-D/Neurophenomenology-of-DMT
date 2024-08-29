@@ -1,0 +1,5 @@
+mkdir -p /Users/slord/Desktop/First_Level/S04JH/ToM_ROI/DMPFC
+
+fslmaths /Users/slord/fsl/data/standard/MNI152_T1_2mm_brain -mul 0 -add 1 -roi 43 1 91 1 47 1 0 1 /Users/slord/Desktop/First_Level/S04JH/ToM_ROI/DMPFC/ToM_S04JH_DMPFC_point -odt float
+
+fslmaths /Users/slord/Desktop/First_Level/S04JH/ToM_ROI/DMPFC/ToM_S02WT_DMPFC_point -kernel sphere 5 -fmean  /Users/slord/Desktop/First_Level/S02WT/ToM_ROI/DMPFC/ToM_S04JH_DMPFC_Sphere -odt float
