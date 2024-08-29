@@ -1,0 +1,91 @@
+%% Replot Danielle analyses in brain
+
+sigaal = [ 1 2 3 4 5 6 7 ]; % change with any significant values
+
+% Replot in a brain
+
+path2mask = '/Users/slord/Downloads/fMRI_analysis/DMT_Neuropheno/Schaefer2018_200Parcels_7Networks_order_FSLMNI152_2mm.nii.gz'; % path to Shcaeffer 100 areas extended
+
+Mask = load_nii(path2mask);
+
+Maskfcd = Mask;
+
+Maskfcd.img = zeros(size(Maskfcd.img));
+
+for tt = 1:length(sigaal) % For each significant aal
+sal = sigaal(tt);
+ idx = find(Mask.img == sal); % obtain 3d index for each significant aal.       
+  %Maskfcd.img(idx) = tstat(sal); % replace with simply '1'
+  Maskfcd.img(idx) = 1; % replace with simply '1'
+
+  clear idx
+end
+
+[v,loc] = min(Maskfcd.img(:));
+Maskfcd.img(find(Maskfcd.img)) = Maskfcd.img(find(Maskfcd.img)) + abs(v) + 0.0000000001;
+
+yname = 'SigParcels_miFC_FacesVSNotFace.nii.gz'; 
+
+% Save the NIfTI file
+outputPath = '/Users/slord/Desktop/Results_Tables/FINAL_Nifti_files/Significant_Schaefer_PARCELS_MI_Conditions/';
+save_nii(Maskfcd, fullfile(outputPath, yname));
+
+disp(['NIfTI file saved to: ' fullfile(outputPath, yname)]);
+
+
+
+%% Obtain proprtion of significant brain systems
+
+ vis = [1:14      101:115];
+ sm = [15 :30    116:134]; 
+ dan = [31:43    135:147];
+ van = [44:54    148:158];
+ limbic = [55:60 159:164];
+ fp = [61 :73 165: 181];
+ dmn = [74: 100 182: 200];
+
+ 
+networks= {vis, sm , dan ,van , limbic ,fp, dmn};
+% Define the vector of significant brain regions
+
+% Count the significant regions in each network
+network_names = {'VIS', 'SM', 'DAN', 'Salience', 'Limbic', 'FP', 'DMN'};
+proportions = zeros(1, length(networks));
+
+for i = 1:length(networks)
+    % Calculate the proportion of significant regions in each network
+    proportions(i) = sum(ismember(sigaal, networks{i})) / length(networks{i});
+end
+
+
+% Order the proportions and network names from larger to smaller
+[sorted_proportions, sort_idx] = sort(proportions, 'descend');
+sorted_network_names = network_names(sort_idx);
+
+% Plot the bar chart
+    figure('Color', 'k');
+bar(sorted_proportions,'r');
+
+ylim([0 1]);
+
+% Get the current axes
+ax = gca;
+
+% Set axes background color to black
+ax.Color = 'k';
+
+% Set the axes and text colors to white
+ax.XColor = 'w';
+ax.YColor = 'w';
+
+set(gca, 'XTickLabel', sorted_network_names, 'linewidth', 2,'Fontsize',20, 'color','k');
+xlabel('Network', 'color','w');
+% ylabel('Proportion of Significant Regions');
+title('Proportion of Significant Regions','color','w');
+
+% Rotate x-axis labels for better readability if needed
+xtickangle(45);
+
+set(gcf, 'color', 'k')
+
+export_fig(sprintf( [yname, '_per_net.png']),'-m2.5')
