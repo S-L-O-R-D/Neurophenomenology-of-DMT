@@ -1,0 +1,549 @@
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Setup
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+clear all
+% Add paths
+currloc=string(pwd);
+homeDir=("C:\Users\dk818\OneDrive - Imperial College London\Lorenzo\Analysis");
+addpath(homeDir);
+
+% For complexity functions
+addpath('C:\Users\dk818\OneDrive - Imperial College London\NCORE\miFCdFC\Functions');
+addpath('C:\Users\dk818\OneDrive - Imperial College London\NCORE\miFCdFC\Functions\mi');
+
+% For spm to convolve timeseries
+addpath('C:\Users\dk818\OneDrive - Imperial College London\LilThingsAndMATLABPrograms\spm12');
+
+% For region names and labels
+addpath(strcat(homeDir,'\Inputs'));
+
+% For State timeseries
+CondDir=('C:\Users\dk818\OneDrive - Imperial College London\Lorenzo\ConditionTimeline');
+
+% For outputs
+str='\Outputs';
+outputpath=strcat(homeDir,str);
+addpath(outputpath);
+
+load('df.mat')
+
+% This computes the number of subjs, which is different for chill vs
+% conservative, and number of sessions (2, DMT vs PCB)
+[n_subj, n_sess]=size(df);
+num_rois=size(df{2,1},1);
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% EXTRACT THE PERIOD OF INTEREST PER EVENT TYPE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%{ 
+Currently, df is a {n_subj, 2} structure. 
+Using the convolved event timeseries, for each event, I will extract the
+volumes that correspond with an occurrence of each event. 
+This means df will be a {n_subj, 8}, where each col =
+cols 1:2 DMT_WholeTimeseries, PCB_WholeTimeseries
+cols 3:4 DMT_Faces, DMT_NotFaces 
+cols 5:6 DMT_Places, DMT_NotPlaces
+cols 7:8 DMT_ToM, DMT_NotToM
+%}
+TR=2.0;
+canonical_hrf=spm_hrf(TR);
+
+for subj=[2,3,6,7,9,10,12,13,15,17,19,22,23,24]
+FinalArray=logical(zeros(3,840));
+IntensityArray=zeros(1,840);
+% Get the file name to load
+if subj<10
+CondfileName=strcat(CondDir,'\S0',num2str(subj),'_Phenomenological_Timeline.xlsx');
+else
+CondfileName=strcat(CondDir,'\S',num2str(subj),'_Phenomenological_Timeline.xlsx');
+end
+tmp=readtable(CondfileName);
+
+% Fix the bloody columns
+% The first three rows from column 11 onwards need to be shifted forward
+% 1. Since there's not a phenomenology by the end, I'll just shift those
+% forward, and zero the 11th col.
+tmp(1:3,12:end)=tmp(1:3,11:end-1);
+tmp(1:3,11)=array2table(zeros(3,1));
+
+% SETUP 
+%%%%%%%%%%%%%%%%%%%
+% Make and get timeseries extraction for each person, for each condition,
+% in a format compatible with the dfs
+% See how long this subjs timeseries is and make an empty array
+maxLen=(size(tmp,2)-3)*60;
+empArray=zeros(size(tmp,1),maxLen);   
+empArray=array2table(empArray);
+tmpHeader=tmp(:,1:3);
+tmp(:,1:3)=[];
+
+% Make each column repeat 60 times
+for ii=1:size(tmp,2)
+if ii==1    
+% for the first 60 values
+empArray(:,1:60)=repmat(tmp(:,ii),1,60);
+else
+% for all other values - e.g., 61:120, 121:180, and so on
+start=((ii-1)*60)+1;
+stop=(ii*60);
+empArray(:,start:stop)=repmat(tmp(:,ii),1,60);
+end
+end
+clear tmp
+SecPlotNotConv=empArray;
+
+% % % Just for plotting - Convolve with the HRF and put in the finalArray
+% % %%%%%%%%%%%%%%%%%%%%%
+% SecPlotNotConv=table2array(SecPlotNotConv);
+% for ii=1:size(SecPlotNotConv,1)
+% SecPlotConv(ii,:)=conv(SecPlotNotConv(ii,:),canonical_hrf);
+% end
+% % Make SecPlotNotConv same length as SecPlotConv
+% SecPlotNotConv(:,end:size(SecPlotConv,2))=0;
+% % Make x axis
+% for ii=1:size(SecPlotNotConv,2)
+%     timeser2(1,ii)=ii;
+% end
+% Title={'Faces','Places','ToM','Intensity'};
+% figure()
+% for ii=1:4
+% subplot(4,1,ii)
+% hold on
+% plot(timeser2', SecPlotConv(ii,:)','LineWidth',1,'MarkerFaceColor','auto','Color','b')
+% plot(timeser2', SecPlotNotConv(ii,:)','LineWidth',1,'MarkerFaceColor','auto','Color','k')
+% hold off
+% title(Title{1,ii})
+% end
+
+% Convolve with the HRF and put in the finalArray
+for ii=1:size(empArray,1)
+tmp=table2array(empArray(ii,:));
+convtmp2=conv(tmp,canonical_hrf);
+
+% We cannot have intensity in Final Array, since it's binarised adn logical, so will make
+% a separate intensity array that 
+%%%%%%%%%%%%%%%%%%
+if ii ~= 4 
+% Binarise to only include seconds greater than 0    
+tmp2=convtmp2>0;
+% Now take every 2 seconds, for TR time
+tmp3=tmp2(1:2:end);
+% Put in the FinalArray 
+FinalArray(ii,1:size(tmp3,2))=tmp3;
+
+% Do the intensity vals 
+else
+tmp2=round(convtmp2);
+% Now take every 2 seconds, for TR time
+tmp3=tmp2(1:2:end);
+IntensityArray(1,1:size(tmp3,2))=tmp3;   
+end
+end
+clear tmp
+
+% % Make plots 
+% %%%%%%%%%%%%%%%%%%%
+% Title={'Faces','Places','ToM','Intensity'};
+% for ii=1:size(FinalArray,2)
+%     timeser(1,ii)=ii;
+% end
+% figure()
+% for ii=1:3
+% subplot(4,1,ii)
+% plot(timeser', FinalArray(ii,:)','LineWidth',1,'MarkerFaceColor','auto')
+% title(Title{1,ii})
+% end
+% subplot(4,1,4)
+% plot(timeser', IntensityArray(1,:)','LineWidth',1,'MarkerFaceColor','auto')
+% title(Title{1,4})
+
+
+% Extraction
+%%%%%%%%%%%%%%%%%%%
+% Extract timeseries data for each condition (rows 1:3 in FinalArray)
+% Reminder of final BigDataStruct{}
+% cols 1:2 DMT_WholeTimeseries, PCB_WholeTimeseries
+% cols 3:4 DMT_Faces, DMT_NotFaces 
+% cols 5:6 DMT_Places, DMT_NotPlaces
+% cols 7:8 DMT_ToM, DMT_NotToM
+% Need to extract intensity for each condition - will make a IntensityDF
+% with the same organisation
+
+% First, make sure your arrays are the same shape
+% Make sure condition timeseries (Ctime) is same length as empirical data
+% Reminder - tmp = ROI*TR
+tmpdf=df{subj,1};
+cutoff=size(tmpdf,2);
+if size(FinalArray,2) > cutoff
+    FinalArray(:,cutoff+1:end)=[];
+    IntensityArray(:,cutoff+1:end)=[];
+end
+
+% Scrub motion 2.0
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% See how long this subjs timeseries is and make an empty array
+empArray=zeros(1,size(IntensityArray,2));   
+% Every 30 TRs, fill the first 6 TRs with 1
+for ii=1:size(empArray,2)/30
+if ii==1    
+% for the first 30 values
+empArray(:,1:6)=1;
+else
+% for all other values - e.g., 61:120, 121:180, and so on
+start=((ii-1)*30)+1;
+stop=start+5;
+empArray(:,start:stop)=1;
+end
+end
+
+% I need to scrub the motion from the following:
+% 1. DMT timeline
+tmpdf(:,logical(empArray))=[];
+df{subj,1}=tmpdf;
+
+% 2. intensity timeline
+IntensityArray(:,logical(empArray))=[];
+Intensitydf{subj,1}=IntensityArray;
+
+% 3. The condition arrays - this involves making any 1s in the first 6
+% TRs of every 30 a 0.
+FinalArray(:,logical(empArray))=[];
+
+% Complete extraction and place in column
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% We want both with and without the condition  
+place=[3,5,7];
+for ii=1:3
+% For Condition - reminder - tmp = df for DMT sesh
+tmp2=tmpdf(:,FinalArray(ii,:));
+df{subj,place(1,ii)}=tmp2;
+Intensitydf{subj,place(1,ii)}=IntensityArray(:,FinalArray(ii,:));
+
+% For NotCondition
+InvFinalArray=FinalArray(ii,:)<1;
+tmp3=tmpdf(:,InvFinalArray);
+df{subj,place(1,ii)+1}=tmp3;
+Intensitydf{subj,place(1,ii)+1}=IntensityArray(:,InvFinalArray);
+end
+clear tmpdf
+end
+
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Compute FC
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for subj=1:n_subj
+for cond=1:(size(df,2)) 
+
+% Not all subjs have all conditions 
+if isempty(df{subj,cond})==0
+disp(strcat('Computing mi for subj',num2str(subj),', sesh ',num2str(cond)))
+
+tmp=df{subj,cond};
+
+for rr1=1:num_rois
+    for rr2=1:num_rois
+        % MI
+        MI{subj,cond}(rr1,rr2) = mutualinfo(tmp(rr1,:)',tmp(rr2,:)');
+
+        % Spearman's
+        [SpearmanRho{subj,cond}(rr1,rr2),SpearmanP{subj,cond}(rr1,rr2)]=corr(tmp(rr1,:)',tmp(rr2,:)','type','Spearman');
+        
+        % Partial corr
+        if cond ~=2
+        tmp2=[tmp(rr1,:)',tmp(rr2,:)'];
+        z=double(Intensitydf{subj,cond})';
+        [Rho,P]=partialcorr(tmp2,z,'Type','Spearman');
+        PartCorrRho{subj,cond}(rr1,rr2)=Rho(2,1);
+        PartCorrP{subj,cond}(rr1,rr2)=P(2,1);
+        end
+    end
+end  
+end
+end
+end
+
+%%
+% Save checkpoint
+name=strcat(outputpath,'\FCResults_Checkpoint5.1.mat');
+save(name,'-v7.3');
+disp('Finished first checkpoint!')
+%%
+%%%%%%
+% % % For visualisation 
+% tmp=MI{2,1};
+% for ii=1:size(tmp,2)
+% tmp(ii,ii)=1;
+% end
+% 
+% figure()
+% imagesc(tmp)
+% colorbar()
+% 
+% figure()
+% imagesc(abs(SpearmanRho{2,1}))
+% colorbar()
+% 
+% figure()
+% imagesc(PartCorrRho{2,1})
+% colorbar()
+% 
+% tmp=PartCorrRho{2,1}-SpearmanRho{2,1};
+% figure()
+% imagesc(abs(tmp))
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Compute the effect of condition on miFC for each event type
+% We will be running the following comparisons:
+% Cols 1 vs 2: DMT vs PLC
+% Cols 3 vs 4: DMT_Faces vs DMT_NotFaces
+% Cols 5 vs 6: DMT_Places vs DMT_NotPlaces
+% Cols 7 vs 8: DMT_ToM vs DMT_NotToM
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+h=0;
+
+% For each pair of ROIs . . .
+for rr1=1:num_rois
+disp(strcat('Computing posthocs for region #',num2str(rr1),' out of ',num2str(num_rois)))
+for rr2=1:rr1
+%  . . . get a table of the pairwise miFC between for each subj (row) for each session (col)    
+for subj=1:size(MI,1)
+for sesh=1:size(df,2)
+if isempty(MI{subj,sesh})==0
+ROIMI(subj,sesh)=MI{subj,sesh}(rr1,rr2);
+ROISpearman(subj,sesh)=SpearmanRho{subj,sesh}(rr1,rr2);
+if sesh==2
+ROIPartialCorr(subj,sesh)=SpearmanRho{subj,sesh}(rr1,rr2);
+else
+ROIPartialCorr(subj,sesh)=PartCorrRho{subj,sesh}(rr1,rr2);
+end
+end
+end
+end
+h=h+1;
+
+% Get rid of subjs we're not using
+SubjsNotIncluded=[1,4,5,8,11,14,16,18,20,21];
+ROIMI(SubjsNotIncluded,:)=[];
+ROISpearman(SubjsNotIncluded,:)=[];
+ROIPartialCorr(SubjsNotIncluded,:)=[];
+
+% Now make anything that's a zero a NaN so it's not computed in sign rank
+for subj=1:size(ROIMI,1)
+for cond=1:size(ROIMI,2)
+if ROIMI(subj,cond)==0
+    ROIMI(subj,cond)=NaN;
+    ROISpearman(subj,cond)=NaN;
+    ROIPartialCorr(subj,cond)=NaN;
+end
+end
+end
+
+% Use Wilcoxon Sign-Rank tests for each comparison
+% Benefit of this test - nonparametric, handles unequal sample sizes, 
+% And compute the effect of session on miFC, Spearman's corrs, and partial
+% corr for the following contrasts:
+% DMT vs Plc, and DMT vs Faces, Places, and ToM
+% FOR EACH CONTRAST:
+% Cols 1:2 = rr1, rr2, 
+% Cols 3:6 = miFC p, miFC FDRp, miFC zstat, miFC effect size
+% Cols 7:10 = Spearman's p, Spearman's FDRp, Spearman's zstat, effect size
+% Cols 11:14 = Partial Corr p, Partial Corr FDRp, Partial Corr zstat,
+% effect size
+
+% Each contrast is a row in ResTbl - 
+% Contrast 1: DMT vs PLC
+% Cols 1 vs 2
+% NOTE - a postive Tstat indicates that DMT miFC>PLC
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+ResTbl{1,1}(h,1)=rr1;
+ResTbl{1,1}(h,2)=rr2;
+% miFC
+[ResTbl{1,1}(h,3),ResTbl{1,1}(h,5),ResTbl{1,1}(h,6)]=PermTest(ROIMI(:,1),ROIMI(:,2));
+% Spearmans
+[ResTbl{1,1}(h,7),ResTbl{1,1}(h,9),ResTbl{1,1}(h,10)]=PermTest(ROISpearman(:,1),ROISpearman(:,2));
+% Partial Corr
+[ResTbl{1,1}(h,11),ResTbl{1,1}(h,13),ResTbl{1,1}(h,14)]=PermTest(ROIPartialCorr(:,1),ROIPartialCorr(:,2));
+
+% Contrast 2: DMT_Faces vs DMT_NotFaces
+% Cols 3 vs 4
+% NOTE - a postive Tstat indicates that Faces > NotFaces
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+ResTbl{2,1}(h,1)=rr1;
+ResTbl{2,1}(h,2)=rr2;
+% miFC
+[ResTbl{2,1}(h,3),ResTbl{2,1}(h,5),ResTbl{2,1}(h,6)]=PermTest(ROIMI(:,3),ROIMI(:,4));
+% Spearmans
+[ResTbl{2,1}(h,7),ResTbl{2,1}(h,9),ResTbl{2,1}(h,10)]=PermTest(ROISpearman(:,3),ROISpearman(:,4));
+% Partial Corr
+[ResTbl{2,1}(h,11),ResTbl{2,1}(h,13),ResTbl{2,1}(h,14)]=PermTest(ROIPartialCorr(:,3),ROIPartialCorr(:,4));
+
+% Contrast 3: DMT_Places vs DMT_NotPlaces
+% Cols 5 vs 6
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+ResTbl{3,1}(h,1)=rr1;
+ResTbl{3,1}(h,2)=rr2;
+% miFC
+[ResTbl{3,1}(h,3),ResTbl{3,1}(h,5),ResTbl{3,1}(h,6)]=PermTest(ROIMI(:,5),ROIMI(:,6));
+% Spearmans
+[ResTbl{3,1}(h,7),ResTbl{3,1}(h,9),ResTbl{3,1}(h,10)]=PermTest(ROISpearman(:,5),ROISpearman(:,6));
+% Partial Corr
+[ResTbl{3,1}(h,11),ResTbl{3,1}(h,13),ResTbl{3,1}(h,14)]=PermTest(ROIPartialCorr(:,5),ROIPartialCorr(:,6));
+
+% Contrast 4: DMT_ToM vs DMT_NotToM
+% Cols 7 vs 8
+%%%%%%%%%%%%%%%%%%%%%%%%%%
+ResTbl{4,1}(h,1)=rr1;
+ResTbl{4,1}(h,2)=rr2;
+% miFC
+[ResTbl{4,1}(h,3),ResTbl{4,1}(h,5),ResTbl{4,1}(h,6)]=PermTest(ROIMI(:,7),ROIMI(:,8));
+% Spearmans
+[ResTbl{4,1}(h,7),ResTbl{4,1}(h,9),ResTbl{4,1}(h,10)]=PermTest(ROISpearman(:,7),ROISpearman(:,8));
+% Partial Corr
+[ResTbl{4,1}(h,11),ResTbl{4,1}(h,13),ResTbl{4,1}(h,14)]=PermTest(ROIPartialCorr(:,7),ROIPartialCorr(:,8));
+
+end
+end
+
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Compute the FDR-corrected pvals 
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for eventType=1:4
+% For miFC
+[~,~,ResTbl{eventType,1}(:,4)]=fdr(ResTbl{eventType,1}(:,3));
+% For Spearman's
+[~,~,ResTbl{eventType,1}(:,8)]=fdr(ResTbl{eventType,1}(:,7));
+% For partial corr
+[~,~,ResTbl{eventType,1}(:,12)]=fdr(ResTbl{eventType,1}(:,11));
+end
+
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Save results
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Add a much-needed header to the tables
+% Cols 1:2 = rr1, rr2, 
+% Cols 3:6 = miFC p, miFC FDRp, miFC zstat, miFC effect size
+% Cols 7:10 = Spearman's p, Spearman's FDRp, Spearman's zstat, effect size
+% Cols 11:14 = Partial Corr p, Partial Corr FDRp, Partial Corr zstat,
+% effect size
+ROINames=readtable('ComboNames.xlsx');
+ComboNames=ROINames;
+HeaderNames={'Region1','Region2','miFC_p','miFC_FDR-p','miFC_Tstat','miFC_CohenD','Spmn_p','Spmn_FDR-p','Spmn_Tstat','Spmn_CohenD','ParCorr_p','ParCorr_FDR-p','ParCorr_Tstat','ParCorr_CohenD','ROI1Name','ROI2Name'};
+SigResTbl={};
+
+for ii=1:size(ResTbl,1)
+ResTbl{ii,1}=array2table(ResTbl{ii,1});
+
+% Let's add region names to be nice
+% Add cols 15 and 16 - names for ROI1 and ROI2 (cols 1 and 2)
+for rr=1:size(ResTbl{ii,1},1)
+ResTbl{ii,1}(rr,15)=ROINames(table2array(ResTbl{ii,1}(rr,1)),1);
+ResTbl{ii,1}(rr,16)=ROINames(table2array(ResTbl{ii,1}(rr,2)),1);
+end
+
+ResTbl{ii,1}.Properties.VariableNames=HeaderNames;
+
+% Now make a table only for sig vals
+% Make indices of what to delete - those that are not sig for miFC (toDel1)
+% and Spearman's (toDel2)
+SigResTbl{ii,1}=ResTbl{ii,1};
+toDel=SigResTbl{ii,1}(:,4)>0.05; 
+SigResTbl{ii,1}(table2array(toDel),:)=[];
+
+clear toDel
+toDel=SigResTbl{ii,1}(:,8)>0.05; 
+SigResTbl{ii,1}(table2array(toDel),:)=[];
+
+end
+
+% Save each row of ResTbl as the contrast name
+writetable(ResTbl{1,1},'Perm_DMTvsPLC_miFCRes.csv')
+writetable(ResTbl{2,1},'Perm_DMT_miFCRes_FaceVsNotFace.csv')
+writetable(ResTbl{3,1},'Perm_DMT_miFCRes_PlaceVsNotPlace.csv')
+writetable(ResTbl{4,1},'Perm_DMT_miFCRes_ToMVsNotToM.csv')
+
+% Save each row of ResTbl as the contrast name
+writetable(SigResTbl{1,1},'PermSig_DMTvsPLC_miFCRes.csv')
+writetable(SigResTbl{2,1},'PermSig_DMT_miFCRes_FaceVsNotFace.csv')
+writetable(SigResTbl{3,1},'PermSig_DMT_miFCRes_PlaceVsNotPlace.csv')
+writetable(SigResTbl{4,1},'PermSig_DMT_miFCRes_ToMVsNotToM.csv')
+
+% cd(outputpath)
+clearvars -except ResTbl MI SpearmanRho SpearmanP PartCorrP PartCorrRho
+save("FCResults_Checkpoint5.5.mat",'-v7.3')
+
+%%
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% Results reliability
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+for ii=1:4 % only doing cond 2:4 until I sort the whole DMT vs Plc
+
+% Then compute ICC for p and FDRp
+pForICC=[ResTbl{ii,1}(:,3),ResTbl{ii,1}(:,7),ResTbl{ii,1}(:,11)];
+pFDRForICC=[ResTbl{ii,1}(:,4),ResTbl{ii,1}(:,8),ResTbl{ii,1}(:,12)];
+[ICCScoreForp(ii,1), ~, ~, ~, ~, ~, ~]=ICC(table2array(pForICC),'A-1');
+[ICCScoreForFDRp(ii,1), ~, ~, ~, ~, ~, ~]=ICC(table2array(pFDRForICC),'A-1');
+
+% What % of sig results are shared across FC analysis type?
+% Compute % of sig results in p and FDRp foe each FC analysis
+% Cols 1-3 = p for miFC, Spearman's, Partial corr
+PropSigRes(ii,1)=sum(table2array(ResTbl{ii,1}(:,3))<0.05)/size(ResTbl{ii,1},1);
+PropSigRes(ii,2)=sum(table2array(ResTbl{ii,1}(:,7))<0.05)/size(ResTbl{ii,1},1);
+PropSigRes(ii,3)=sum(table2array(ResTbl{ii,1}(:,11))<0.05)/size(ResTbl{ii,1},1);
+% Cols 4-6 = FDR p for miFC, Spearman's, Partial corr
+PropSigRes(ii,4)=sum(table2array(ResTbl{ii,1}(:,4))<0.05)/size(ResTbl{ii,1},1);
+PropSigRes(ii,5)=sum(table2array(ResTbl{ii,1}(:,8))<0.05)/size(ResTbl{ii,1},1);
+PropSigRes(ii,6)=sum(table2array(ResTbl{ii,1}(:,12))<0.05)/size(ResTbl{ii,1},1);
+end
+
+%%
+
+% For Lorenzo
+% Make tables for ROI and for ROI with significant differences in miFC
+% between conditions
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%5
+ROIResTbl={};
+SigROIResTbl={};
+
+for ii=1:4
+% Get rid of everything that's not ROI 201-203
+ROIResTbl{ii,1}=ResTbl{ii,1}(20101:end,:); 
+
+% Starting to find vals that are sig for miFC and Spearman's 
+SigROIResTbl{ii,1}=ROIResTbl{ii,1};
+
+% Old - only keeping vals that are sig for miFC
+toDel=SigROIResTbl{ii,1}(:,4)>0.05; 
+SigROIResTbl{ii,1}(table2array(toDel),:)=[];
+
+% % Make indices of what to delete - those that are not sig for miFC (toDel1)
+% % and Spearman's (toDel2)
+% toDel1=table2array(SigROIResTbl{ii,1}(:,4))>0.05;
+% toDel2=table2array(SigROIResTbl{ii,1}(:,8))>0.05;
+% toDel=toDel1+toDel2;
+% SigROIResTbl2{ii,1}(table2array(toDel),:)=[];
+end
+
+% Save each row of ResTbl as the contrast name
+writetable(ROIResTbl{1,1},'ROIRes_Perm_DMTvsPLC_miFCRes.csv')
+writetable(ROIResTbl{2,1},'ROIRes_Perm_DMT_miFCRes_FaceVsNotFace.csv')
+writetable(ROIResTbl{3,1},'ROIRes_Perm_DMT_miFCRes_PlaceVsNotPlace.csv')
+writetable(ROIResTbl{4,1},'ROIRes_Perm_DMT_miFCRes_ToMVsNotToM.csv')
+
+writetable(SigROIResTbl{1,1},'SigROIRes_Perm_DMTvsPLC_miFCRes.csv')
+writetable(SigROIResTbl{2,1},'SigROIRes_Perm_DMT_miFCRes_FaceVsNotFace.csv')
+writetable(SigROIResTbl{3,1},'SigROIRes_Perm_DMT_miFCRes_PlaceVsNotPlace.csv')
+writetable(SigROIResTbl{4,1},'SigROIRes_Perm_DMT_miFCRes_ToMVsNotToM.csv')
+
+
+%%
+clearvars -except SpearmanP SpearmanRho PartCorrP PartCorrRho MI
+save('CorrMatsForChris.mat','-v7.3')
